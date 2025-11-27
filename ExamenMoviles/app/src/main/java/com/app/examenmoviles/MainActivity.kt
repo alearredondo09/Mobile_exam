@@ -11,8 +11,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.app.examenmoviles.presentation.navigation.NavGraph
 import com.app.examenmoviles.presentation.theme.ExamenMovilesTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,7 +23,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ExamenMovilesTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    // TODO: AQUI VAMOS A COMENZAR
+                    NavGraph(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
