@@ -2,6 +2,7 @@ package com.app.examenmoviles.di
 
 import android.content.Context
 import com.app.examenmoviles.data.local.preferences.HoroscopePreferences
+import com.app.examenmoviles.data.local.preferences.SudokuPreferences
 import com.app.examenmoviles.data.remote.api.ApiKeyInterceptor
 import com.app.examenmoviles.data.remote.api.SudokuApi
 import com.app.examenmoviles.data.repository.HoroscopeRepositoryImpl
@@ -63,4 +64,11 @@ object AppModule {
         @ApplicationContext context: Context,
         gson: Gson,
     ): HoroscopePreferences = HoroscopePreferences(context, gson)
+
+    @Provides
+    @Singleton
+    fun provideSudokuPreferences(
+        @ApplicationContext context: Context,
+        gson: Gson,
+    ): SudokuPreferences = SudokuPreferences(context, gson)
 }

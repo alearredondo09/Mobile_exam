@@ -18,27 +18,8 @@ class HoroscopeRepositoryImpl
         override suspend fun getHoroscope(zodiac: String): Horoscope {
             val clean = zodiac.trim().lowercase()
 
-            // 1️⃣ Intentar cache primero si está vigente
-            prefs.getHoroscopeCache()?.let { cache ->
-                if (prefs.isCacheValid()) {
-                    return cache.horoscope // cache fresco
-                }
-            }
+            val dto = api.getHoroscope(clean)
 
-            return try {
-                // 2️⃣ Si no hay cache válido → llamar API
-                val dto = api.getHoroscope(clean)
-                val horoscope = dto.toDomain(clean)
-
-                // Guardar en cache
-                prefs.saveHoroscope(horoscope)
-
-                horoscope
-            } catch (e: Exception) {
-                // 3️⃣ Si falla la red → usar cache viejo si existe
-                prefs.getHoroscopeCache()?.let { cache ->
-                    return cache.horoscope
-                } ?: throw e
-            }
+            return dto.toDomain(clean)
         }
     }

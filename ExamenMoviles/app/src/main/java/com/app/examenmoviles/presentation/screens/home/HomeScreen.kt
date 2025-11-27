@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,24 +46,20 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onButtonClick: () -> Unit,
 ) {
-    println("Entro al Home Screen")
+    // Estado principal emitido por el ViewModel
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Controla qué vista mostrar según el estado
     when {
         uiState.isLoading -> {
-            println("Entro al loading")
             LoadingView()
         }
-        uiState.error != null -> {
-            println("Entro al error")
-            ErrorView(uiState.error!!)
-        }
         uiState.sudoku != null -> {
-            println("Entro al horoscope")
+            // Muestra la pantalla principal con el tablero
             SudokuView(uiState.sudoku!!, onButtonClick, viewModel)
         }
         else -> {
-            println("Entro al emptyview")
+            // Pantalla vacía cuando no hay datos
             EmptyView()
         }
     }
@@ -71,13 +68,7 @@ fun HomeScreen(
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun LoadingView() {
-    androidx.compose.material3.Text("Cargando sudoku...")
-}
-
-@Suppress("ktlint:standard:function-naming")
-@Composable
-fun ErrorView(message: String) {
-    androidx.compose.material3.Text("Error: $message")
+    Text("Cargando sudoku...")
 }
 
 @Suppress("ktlint:standard:function-naming")
@@ -87,13 +78,43 @@ fun SudokuView(
     onButtonClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
+    // Estado del tablero actual
     val board by viewModel.boardState.collectAsStateWithLifecycle()
 
+    // Estado de dificultad actual
+    val difficulty by viewModel.currentDifficulty.collectAsStateWithLifecycle()
+
+    // Dialogos controlados por la UI
     var showOptionsDialog by remember { mutableStateOf(false) }
     var showVerifyDialog by remember { mutableStateOf(false) }
     var verifyMessage by remember { mutableStateOf("") }
     var verifyColor by remember { mutableStateOf(Color.White) }
 
+    // Error emitido por ViewModel (por ejemplo, no hay conexión)
+    val uiError =
+        viewModel.uiState
+            .collectAsStateWithLifecycle()
+            .value.error
+    var showErrorDialog by remember { mutableStateOf(false) }
+
+    // Cuando aparece un error, abrir el diálogo automáticamente
+    LaunchedEffect(uiError) {
+        if (uiError != null) showErrorDialog = true
+    }
+
+    // Diálogo de error (modo offline o errores de API)
+    if (showErrorDialog && uiError != null) {
+        VerifyDialog(
+            message = uiError,
+            color = Color(0xFFEF4444),
+            onDismiss = {
+                showErrorDialog = false
+                viewModel.clearError()
+            },
+        )
+    }
+
+    // Diálogo para elegir tamaño y dificultad del sudoku
     if (showOptionsDialog) {
         SudokuOptionsDialog(
             onOptionSelected = { width, height, difficulty ->
@@ -104,6 +125,7 @@ fun SudokuView(
         )
     }
 
+    // Diálogo de verificación de solución
     if (showVerifyDialog) {
         VerifyDialog(
             message = verifyMessage,
@@ -112,6 +134,7 @@ fun SudokuView(
         )
     }
 
+    // Contenedor principal
     Column(
         modifier =
             Modifier
@@ -120,6 +143,7 @@ fun SudokuView(
                 .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // Texto del tamaño del tablero
         Text(
             text = "Sudoku ${board.size} x ${board.size}",
             color = Color.White,
@@ -128,6 +152,7 @@ fun SudokuView(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Área donde se dibuja el tablero
         Box(
             modifier =
                 Modifier
@@ -144,11 +169,12 @@ fun SudokuView(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Botones de reiniciar y nuevo sudoku
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            Button(onClick = { resetBoard(board, sudoku.puzzle) }) {
+            Button(onClick = { viewModel.resetBoardToOriginal() }) {
                 Text("Reiniciar")
             }
 
@@ -156,18 +182,20 @@ fun SudokuView(
                 Text("Nuevo Sudoku")
             }
         }
+
+        // Botón para verificar solución
         Button(onClick = {
             val correct = verifySolution(board, sudoku.solution)
 
             if (correct) {
                 verifyMessage = "¡Correcto! Sudoku completado"
-                verifyColor = Color(0xFF22C55E) // verde
+                verifyColor = Color(0xFF22C55E)
             } else {
                 verifyMessage = "La solución tiene errores. Revisa nuevamente."
-                verifyColor = Color(0xFFEF4444) // rojo
+                verifyColor = Color(0xFFEF4444)
             }
 
-            showVerifyDialog = true // mostrar dialog
+            showVerifyDialog = true
         }) {
             Text("Verificar solución")
         }
@@ -177,15 +205,18 @@ fun SudokuView(
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun EmptyView() {
-    androidx.compose.material3.Text("Sin datos aún...")
+    // Vista simple cuando no hay datos
+    Text("Sin datos aún...")
 }
 
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun SudokuGrid(puzzle: List<List<Int>>) {
-    val size = puzzle.size // 4 o 9
+    // Tamaño del tablero
+    val size = puzzle.size
     val cellSize = if (size == 4) 60.dp else 40.dp
 
+    // Muestra un tablero estático
     Column {
         puzzle.forEach { row ->
             Row {
@@ -216,11 +247,11 @@ fun SudokuGridInteractive(
     originalPuzzle: List<List<Int>>,
     onCellValueChange: (row: Int, col: Int, value: Int) -> Unit,
 ) {
+    // Cantidad de columnas según tamaño del tablero
     val size = board.size
-    val columns = size
 
     LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
+        columns = GridCells.Fixed(size),
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -252,8 +283,10 @@ fun SudokuCell(
     maxNumber: Int,
     onValueSelected: (Int) -> Unit,
 ) {
+    // Controla si se muestra el diálogo de selección de número
     var showDialog by remember { mutableStateOf(false) }
 
+    // Representación visual de cada celda
     Box(
         modifier =
             Modifier
@@ -276,6 +309,7 @@ fun SudokuCell(
         )
     }
 
+    // Muestra selector de número cuando se toca una celda editable
     if (showDialog) {
         NumberPickerDialog(
             maxNumber = maxNumber,
@@ -294,6 +328,7 @@ fun NumberPickerDialog(
     onSelect: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // Dialogo que muestra las opciones de números válidos
     Dialog(onDismissRequest = { onDismiss() }) {
         Surface(
             shape = MaterialTheme.shapes.medium,
@@ -335,24 +370,12 @@ fun NumberPickerDialog(
     }
 }
 
-fun resetBoard(
-    board: List<MutableList<Int>>,
-    original: List<List<Int>>,
-) {
-    board.forEachIndexed { row, rowList ->
-        rowList.forEachIndexed { col, _ ->
-            if (original[row][col] == 0) {
-                rowList[col] = 0
-            }
-        }
-    }
-}
-
 @Composable
 fun SudokuOptionsDialog(
     onOptionSelected: (Int, Int, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // Estados para tamaño y dificultad elegidos
     var size by remember { mutableStateOf(4) }
     var difficulty by remember { mutableStateOf("easy") }
 
@@ -370,17 +393,15 @@ fun SudokuOptionsDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                //  TAMAÑO
                 Text("Tamaño del tablero", color = Color.White)
 
                 Row(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    // --- BOTÓN 4x4 ---
                     Button(
                         colors =
-                            androidx.compose.material3.ButtonDefaults.buttonColors(
+                            ButtonDefaults.buttonColors(
                                 containerColor = if (size == 4) Color(0xFF6366F1) else Color(0xFF374151),
                                 contentColor = Color.White,
                             ),
@@ -389,10 +410,9 @@ fun SudokuOptionsDialog(
                         Text("4x4")
                     }
 
-                    // --- BOTÓN 9x9 ---
                     Button(
                         colors =
-                            androidx.compose.material3.ButtonDefaults.buttonColors(
+                            ButtonDefaults.buttonColors(
                                 containerColor = if (size == 9) Color(0xFF6366F1) else Color(0xFF374151),
                                 contentColor = Color.White,
                             ),
@@ -404,7 +424,6 @@ fun SudokuOptionsDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                //  DIFICULTAD
                 Text("Dificultad", color = Color.White)
 
                 Row(
@@ -413,30 +432,36 @@ fun SudokuOptionsDialog(
                 ) {
                     Button(
                         colors =
-                            androidx.compose.material3.ButtonDefaults.buttonColors(
+                            ButtonDefaults.buttonColors(
                                 containerColor = if (difficulty == "easy") Color(0xFF22C55E) else Color(0xFF374151),
                                 contentColor = Color.White,
                             ),
                         onClick = { difficulty = "easy" },
-                    ) { Text("Easy") }
+                    ) {
+                        Text("Easy")
+                    }
 
                     Button(
                         colors =
-                            androidx.compose.material3.ButtonDefaults.buttonColors(
+                            ButtonDefaults.buttonColors(
                                 containerColor = if (difficulty == "medium") Color(0xFFFACC15) else Color(0xFF374151),
                                 contentColor = Color.White,
                             ),
                         onClick = { difficulty = "medium" },
-                    ) { Text("Medium") }
+                    ) {
+                        Text("Medium")
+                    }
 
                     Button(
                         colors =
-                            androidx.compose.material3.ButtonDefaults.buttonColors(
+                            ButtonDefaults.buttonColors(
                                 containerColor = if (difficulty == "hard") Color(0xFFEF4444) else Color(0xFF374151),
                                 contentColor = Color.White,
                             ),
                         onClick = { difficulty = "hard" },
-                    ) { Text("Hard") }
+                    ) {
+                        Text("Hard")
+                    }
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -445,7 +470,6 @@ fun SudokuOptionsDialog(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    // Salir
                     Button(
                         onClick = onDismiss,
                         colors =
@@ -457,7 +481,6 @@ fun SudokuOptionsDialog(
                         Text("Salir")
                     }
 
-                    //  CONFIRMAR
                     Button(onClick = {
                         val (w, h) = if (size == 4) (2 to 2) else (3 to 3)
                         onOptionSelected(w, h, difficulty)
@@ -474,6 +497,7 @@ fun verifySolution(
     board: List<List<Int>>,
     solution: List<List<Int>>,
 ): Boolean {
+    // Compara el tablero actual con la solución provista por la API
     for (row in board.indices) {
         for (col in board[row].indices) {
             if (board[row][col] != solution[row][col]) {
@@ -489,11 +513,13 @@ fun VerifyDialog(
     message: String,
     color: Color,
     onDismiss: () -> Unit,
+    onRetry: (() -> Unit)? = null,
 ) {
+    // Diálogo reutilizable para mostrar mensajes de éxito o error
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = MaterialTheme.shapes.large,
-            color = Color(0xFF1E293B), // azul gris elegante
+            color = Color(0xFF1E293B),
             tonalElevation = 6.dp,
             shadowElevation = 12.dp,
             modifier = Modifier.padding(24.dp),
@@ -502,7 +528,6 @@ fun VerifyDialog(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Círculo con color (verde/rojo)
                 Box(
                     modifier =
                         Modifier
@@ -519,7 +544,6 @@ fun VerifyDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Mensaje
                 Text(
                     text = message,
                     color = Color.White,
@@ -529,12 +553,11 @@ fun VerifyDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Botón elegante
                 Button(
                     onClick = onDismiss,
                     colors =
                         ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF3B82F6), // azul bonito
+                            containerColor = Color(0xFF3B82F6),
                             contentColor = Color.White,
                         ),
                     modifier = Modifier.fillMaxWidth(0.6f),
