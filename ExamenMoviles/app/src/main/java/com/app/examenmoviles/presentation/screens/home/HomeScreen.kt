@@ -90,7 +90,7 @@ fun SudokuView(
     var verifyMessage by remember { mutableStateOf("") }
     var verifyColor by remember { mutableStateOf(Color.White) }
 
-    // Error emitido por ViewModel (por ejemplo, no hay conexión)
+    // Error emitido por ViewModel ( no hay conexión)
     val uiError =
         viewModel.uiState
             .collectAsStateWithLifecycle()
@@ -497,7 +497,7 @@ fun verifySolution(
     board: List<List<Int>>,
     solution: List<List<Int>>,
 ): Boolean {
-    // Compara el tablero actual con la solución provista por la API
+    // Compara el tablero actual con la solución provista por la API guardada en solution
     for (row in board.indices) {
         for (col in board[row].indices) {
             if (board[row][col] != solution[row][col]) {
@@ -513,7 +513,6 @@ fun VerifyDialog(
     message: String,
     color: Color,
     onDismiss: () -> Unit,
-    onRetry: (() -> Unit)? = null,
 ) {
     // Diálogo reutilizable para mostrar mensajes de éxito o error
     Dialog(onDismissRequest = onDismiss) {
